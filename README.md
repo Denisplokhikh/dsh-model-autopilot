@@ -32,11 +32,21 @@ The plugin only uses providers and models you already configured in DeepSeek Har
 
 ## Install
 
-This package is a DSH bundle plugin: `dsh.bundle.patch` in [package.json](package.json) points at [cordis.patch.yml](cordis.patch.yml), which inserts one `model-autopilot` row into the profile — disabled by default.
+This package is a DSH bundle plugin: `dsh.bundle.patch` in [package.json](package.json) points at [cordis.patch.yml](cordis.patch.yml), which inserts one `model-autopilot` row into the profile — with the policy off by default.
 
-### A. From the plugin catalog (Discover)
+### A. One line to your agent (easiest)
 
-The repository ships [index.json](index.json), a catalog index pinned to a release commit.
+Paste this into a DSH agent chat:
+
+```
+Install the plugin github:Denisplokhikh/dsh-model-autopilot
+```
+
+The agent calls `plugin_manager` → `install_bundle` with that spec: it adds the package to the profile dependencies, applies the bundle patch and enables the package. There is nothing to edit by hand — no `package.json`, no Cordis patch, no `pnpm`. The package declares no runtime dependencies, so the install runs no build scripts and asks for no approvals. Updating goes the same way: remove the package (`remove_bundle`) and install it again, because a git spec is pinned to a commit.
+
+### B. From the plugin catalog (Discover)
+
+The interface path. The repository ships [index.json](index.json), a catalog index pinned to a release commit.
 
 1. Enable the optional bundle `@deepseek-ai/dsh-experimental-plugin-market-bundle` in **Settings → Plugins** (it ships with DSH, off by default) and open the **Discover** tab.
 2. Add the catalog URL:
@@ -45,15 +55,15 @@ The repository ships [index.json](index.json), a catalog index pinned to a relea
    ```
 3. Search for **Autopilot** and install it.
 
-### B. From a clone or a local checkout
+### C. From a clone or a local checkout (development)
 
 ```bash
 git clone https://github.com/Denisplokhikh/dsh-model-autopilot.git
 ```
 
-Then ask your DSH agent to install the bundle from that absolute directory (`plugin_manager` → `install_bundle`). The sidebar entry appears after the Web client reloads.
+Then ask your DSH agent to install the bundle from that absolute directory (`plugin_manager` → `install_bundle`). This installs a working copy: file edits are picked up without reinstalling, and `remove_bundle` only detaches it.
 
-### C. Manual profile dependency
+### D. Manual profile dependency (advanced)
 
 For a hand-managed profile, add the package as a dependency of the profile and install it:
 
@@ -67,13 +77,19 @@ For a hand-managed profile, add the package as a dependency of the profile and i
 
 The bundle patch then inserts the row into the profile's Cordis patch. Set its config from the [Configuration](#configuration) section and `enabled: true` when you want the autopilot on. If the row is missing, copy the `insert` block from [cordis.patch.yml](cordis.patch.yml) into the profile patch. How a profile applies patches is DSH-side; see the DSH docs. The plugin never edits `cordis.patch.yml` at runtime — the panel writes through the profile's config editor.
 
-After any install path, open **Autopilot** in the left sidebar, configure the plugin, and enable it. If the sidebar entry does not appear, reload the Web client.
+## After installing
+
+1. Open **Autopilot** in the left sidebar (reload the Web client if the entry is missing).
+2. Check **Tiers** and **Classifier** as described in [First run](#first-run).
+3. Press **Enable**. The plugin intentionally installs disabled: it will not start switching models without your consent.
+
+The policy takes effect from the next agent step. Until then the plugin observes nothing and changes nothing.
 
 ## First run
 
 1. Open **Autopilot** in the left sidebar.
 2. Under **Tiers**, either leave a tier empty or pick a provider and model for it. An empty tier inherits your deployment default model and derives its reasoning effort (see [Auto tier resolution](#auto-tier-resolution)); the line under the picker shows the effective route and where it came from.
-3. In **Classifier**, keep **Local heuristics** for the instant offline path, or choose **Fast model of my provider** to let your own fast-tier model refine the classification. The **Classifier timeout, ms** field appears only in fast mode.
+3. In **Classifier**, keep **Local heuristics** for the instant offline path, or choose **Fast model of my provider** to let your own model refine the classification. In fast mode pick **Model for classification** — leave it on **Light tier (default)** to reuse the Light model, or choose a dedicated cheap model. The **Classifier timeout, ms** field controls the deadline.
 4. Set **Tool failures before switching to complex** if the default of `2` does not fit your workflow.
 5. Save, then Enable. The policy applies from the next step.
 
@@ -83,7 +99,7 @@ The panel (title **Model autopilot**, sidebar entry **Autopilot**) edits the sam
 
 - **State** — enabled or disabled (**Enabled**/**Disabled**), the Enable/Disable switch, and **Default model for new sessions**.
 - **Tiers** — **Light**, **Medium**, **Complex**, each picked as a provider and model, grouped by provider. Below every picker the effective route is shown as `provider / model · effort — source`, where the source is **configured**, **auto from your default model**, **your default model (no reasoning levels)**, or **not available yet**.
-- **Classifier** — **Local heuristics** or **Fast model of my provider**, plus **Classifier timeout, ms** (200–10000) when the fast model is selected.
+- **Classifier** — **Local heuristics** or **Fast model of my provider**; in fast mode a **Model for classification** picker (**Light tier (default)** or any advertised model), the effective classifier route, and **Classifier timeout, ms** (200–10000).
 - **Tool failures before switching to complex** — the escalation threshold (0–20).
 - **Recent decisions** — tier, provider/model (with the reasoning effort when there is one), reason (**by request**, **after failures**, **by fast model**), classifier score, and time.
 
@@ -116,13 +132,13 @@ If the default model advertises no reasoning levels, every tier resolves to the 
 
 ### Fast-model classifier (`classifier: fast`)
 
-When the classifier is set to the fast model, the host sends one tiny request per user message (only messages of 12 or more characters, and not while escalation is active) through the `llm` service using the fast tier of your provider — or the deployment default model when the fast tier inherits it. The request uses the prompt from [classifier.js](classifier.js) and is cut off at `classifierTimeoutMs` (default `1500`, valid 200–10000). A timeout, a provider error or an unparseable reply keeps the local verdict. A parsed verdict is applied only when it differs from the local one, the message is still the latest, and the agent is running.
+When the classifier is set to the fast model, the host sends one tiny request per user message (only messages of 12 or more characters, and not while escalation is active) through the `llm` service. The route is the **Model for classification** you picked, otherwise the Light tier, otherwise the deployment default model. The request uses the prompt from [classifier.js](classifier.js), the model's least reasoning effort, and the session id (some providers, e.g. OpenCode Go, route and attribute a request by its conversation header and reject it otherwise). It is cut off at `classifierTimeoutMs` (default `1500`, valid 200–10000). A timeout, a provider error or an unparseable reply keeps the local verdict. A parsed verdict is applied only when it differs from the local one, the message is still the latest, and the agent is running.
 
 Because the model for a step is fixed before the step starts, the verdict can only refine a step that has not been prepared yet. The panel's recent-decisions log marks these switches **by fast model**.
 
 ## Configuration
 
-The row in the profile Cordis patch. Settings saved in the panel end up in the same block, including `classifier` and `classifierTimeoutMs`:
+The row in the profile Cordis patch. Settings saved in the panel end up in the same block, including `classifier`, `classifierTimeoutMs` and `classifierModel`:
 
 ```yaml
 - insert:
@@ -133,6 +149,9 @@ The row in the profile Cordis patch. Settings saved in the panel end up in the s
         escalateAfterErrors: 2
         classifier: local
         classifierTimeoutMs: 1500
+        classifierModel:
+          provider: ''
+          model: ''
         tiers:
           fast:
             provider: deepseek
@@ -154,8 +173,9 @@ The provider, model and effort ids above are examples for shape only: use the id
 | --- | --- | --- |
 | `enabled` | `false` | Master switch. While false the plugin observes nothing and never changes a model. |
 | `escalateAfterErrors` | `2` | Consecutive failing tool results in a session before the Complex tier is selected. Integer 0–20; `0` disables escalation. |
-| `classifier` | `"local"` | `"local"`: heuristic only, no model request. `"fast"`: one small classification request through the fast-tier model, with the local verdict as fallback. |
+| `classifier` | `"local"` | `"local"`: heuristic only, no model request. `"fast"`: one small classification request through the selected classifier model, with the local verdict as fallback. |
 | `classifierTimeoutMs` | `1500` | Upper bound for that request, integer 200–10000. On timeout the local verdict is used. Ignored when `classifier: local`. |
+| `classifierModel.provider` / `classifierModel.model` | `""` | Explicit route for the classification request. Empty pair = the Light tier, then the deployment default model. Set both or neither; the host rejects an incomplete pair. |
 | `tiers.fast.provider` / `tiers.fast.model` | `""` | Provider id and model id from **Settings → Models**. Set both or neither; an empty pair means auto resolution. |
 | `tiers.fast.reasoningEffort` | `""` | Optional effort id the model advertises. The panel's tier picker chooses provider and model only; set the effort here. Empty = the model's default effort, and for an inherited tier the plugin derives the effort from the model. |
 | `tiers.coder.*` | — | Same three keys for the Medium tier. |
