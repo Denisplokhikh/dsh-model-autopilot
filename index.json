@@ -49,7 +49,7 @@
         "en": "Left-sidebar panel that switches the agent model per step: fast for ordinary turns, coder for complex requests, heavy after repeated tool failures.",
         "ru": "Панель в левой боковой панели: переключает модель агента на каждом шаге — быстрая для обычных ходов, для кода на сложных запросах, тяжёлая после повторяющихся ошибок инструментов."
       },
-      "icon": "https://raw.githubusercontent.com/Denisplokhikh/dsh-model-autopilot/16684ba4f3487e7f5b84036bec2a20f760715b5a/icon.svg",
+      "icon": "https://raw.githubusercontent.com/Denisplokhikh/dsh-model-autopilot/e3b509754cf0ded5980ddf985a541ba2246d7f0e/icon.svg",
       "author": "Denisplokhikh",
       "homepage": "https://github.com/Denisplokhikh/dsh-model-autopilot",
       "repository": {
@@ -74,11 +74,11 @@
       "versions": [
         {
           "version": "1.0.0",
-          "publishTimestamp": 1794192444,
+          "publishTimestamp": 1794192611,
           "source": {
             "type": "git",
             "url": "https://github.com/Denisplokhikh/dsh-model-autopilot",
-            "commit": "16684ba4f3487e7f5b84036bec2a20f760715b5a"
+            "commit": "e3b509754cf0ded5980ddf985a541ba2246d7f0e"
           }
         }
       ]
