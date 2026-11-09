@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Model autopilot",
-    "description": "A left-sidebar panel that switches the agent model for each step by task and tool failures."
+    "description": "A left-sidebar panel that switches the agent model per step: light for ordinary turns, medium for code work, complex for multi-step tasks and after repeated tool failures."
   }
 }

@@ -2,116 +2,127 @@
 
 # Model Autopilot — a DSH plugin
 
-**One panel in the left sidebar, and every agent step runs on the model that fits it: a cheap model for ordinary turns, a strong coder model for real work, the heavy model only when the agent is stuck.**
+A left-sidebar panel that switches the agent model per step: **Light** for ordinary turns, **Medium** for focused code work, and **Complex** for multi-step work or after repeated tool failures.
 
-`DSH 0.2.x` · `MIT` · `no build step` · `no dependencies` · `no telemetry`
+`MIT` · `no build step` · `no runtime dependencies` · `no telemetry` · `no third-party API keys`
 
 [Русская версия](README.ru.md)
 
----
+## What it does
 
-## Why
+A coding session is not uniformly hard. Some steps look up a file, run a test, or answer a question; others plan a migration or untangle a failing trace. Running the biggest model for everything is wasteful, and running a small one for architecture is false economy. Model Autopilot classifies each incoming user message and selects the model for the next agent step from the tiers you configured.
 
-A coding agent usually runs one model for the whole session. That is either wasteful or
-underpowered:
-
-- a **small model** is fine for “open the file”, “run the tests”, “answer this” — and 90% of steps
-  are exactly that;
-- a **big model** is worth its price only on the steps that matter: architecture, a tricky fix,
-  a refactor, an implementation from scratch;
-- when the agent is **looping on errors**, the useful move is to bring in the biggest model it has.
-
-Model Autopilot does that switch by itself, before the step starts, and shows you the decisions.
-
-| Tier | When it is picked | Typical choice |
+| Tier | Id | When it is picked |
 | --- | --- | --- |
-| **fast** | every new user message, unless something below applies | small, cheap, fast |
-| **coder** | the message looks like real work: architecture, refactoring, a fix, a rewrite, optimization, an implementation | a strong coding model |
-| **heavy** | a configurable number of consecutive failing tool results in the session | the largest model you have |
+| Light | `fast` | Ordinary turns, short questions, small lookups. |
+| Medium | `coder` | Focused code changes, debugging, reviews. |
+| Complex | `heavy` | Architecture, migrations, wide refactors, and error loops. |
 
-You choose the provider and model for each tier in the panel. Nothing is hardcoded, and the plugin
-is **off until you enable it**.
+Nothing is hardcoded, and the plugin is off until you enable it.
 
-## Screenshot
+### Zero third-party API keys
 
-<!--docs/screenshot.png-->
-
-The panel lives in the left sidebar under **Autopilot**: enable switch, three tier pickers fed from
-your configured providers, the failure threshold, and the log of the last decisions.
+The plugin only uses providers and models you already configured in DeepSeek Harness (**Settings → Models**). There are no hardcoded model ids, no external classifier service, no telemetry and no extra account. In the default `local` mode the classification never leaves the DSH process; the optional `fast` mode makes one small request through your own fast-tier model (see below).
 
 ## Requirements
 
-- DSH Desktop or DSH Web with a profile — 0.2.x (built and tested against `0.2.2-rc.1`).
-- At least one provider configured in **Settings → Models**. Tiers are picked from the models your
-  providers advertise.
+- DSH Desktop or DSH Web with a profile — 0.2.x (built and tested against `0.2.2-rc.1`). The profile must provide the standard `llm`, `agentDefaultModel` and `configEditor` services — stock desktop and web profiles do.
+- At least one provider configured in **Settings → Models**.
+- Node.js 20 or newer to run the repository's offline self-test (`"engines"` in [package.json](package.json)). DSH runs the plugin itself.
 
 ## Install
 
-### A. From a plugin catalog (Discover)
+This package is a DSH bundle plugin: `dsh.bundle.patch` in [package.json](package.json) points at [cordis.patch.yml](cordis.patch.yml), which inserts one `model-autopilot` row into the profile — disabled by default.
 
-DSH can read plugin catalogs — JSON indexes a user adds by URL. This repository ships one:
-`index.json`.
+### A. From the plugin catalog (Discover)
 
-1. Enable the optional bundle `@deepseek-ai/dsh-experimental-plugin-market-bundle` in
-   **Settings → Plugins** (it ships with DSH, off by default) and open the **Discover** tab.
-2. Add this index URL in the catalog settings:
+The repository ships [index.json](index.json), a catalog index pinned to a release commit.
 
+1. Enable the optional bundle `@deepseek-ai/dsh-experimental-plugin-market-bundle` in **Settings → Plugins** (it ships with DSH, off by default) and open the **Discover** tab.
+2. Add the catalog URL:
    ```
    https://raw.githubusercontent.com/Denisplokhikh/dsh-model-autopilot/main/index.json
    ```
+3. Search for **Autopilot** and install it.
 
-3. Search for **Autopilot** and install it. The index entry is pinned to a commit, so what you get is
-   exactly the tagged code.
-
-### B. From a clone
+### B. From a clone or a local checkout
 
 ```bash
 git clone https://github.com/Denisplokhikh/dsh-model-autopilot.git
 ```
 
-Then ask your DSH agent:
+Then ask your DSH agent to install the bundle from that absolute directory (`plugin_manager` → `install_bundle`). The sidebar entry appears after the Web client reloads.
 
-> Install the DSH plugin bundle from `C:\path\to\dsh-model-autopilot`
+### C. Manual profile dependency
 
-The agent installs it with `plugin_manager` (`install_bundle`, an absolute directory). The sidebar
-entry appears after the Web client reloads.
+For a hand-managed profile, add the package as a dependency of the profile and install it:
 
-### C. npm
+```json
+{
+  "dependencies": {
+    "dsh-model-autopilot": "github:Denisplokhikh/dsh-model-autopilot"
+  }
+}
+```
 
-Not published yet. If you want it on npm, open an issue — the package metadata is ready.
+The bundle patch then inserts the row into the profile's Cordis patch. Set its config from the [Configuration](#configuration) section and `enabled: true` when you want the autopilot on. If the row is missing, copy the `insert` block from [cordis.patch.yml](cordis.patch.yml) into the profile patch. How a profile applies patches is DSH-side; see the DSH docs. The plugin never edits `cordis.patch.yml` at runtime — the panel writes through the profile's config editor.
+
+After any install path, open **Autopilot** in the left sidebar, configure the plugin, and enable it. If the sidebar entry does not appear, reload the Web client.
 
 ## First run
 
-1. Click **Autopilot** in the left sidebar.
-2. Pick a provider and model for each tier you want to use. An empty tier is skipped; the plugin
-   falls back to the first configured tier, so configuring **fast** alone is a valid start.
-3. Set **Tool failures before switching to heavy** (default `2`).
-4. Press **Save**, then **Enable**.
+1. Open **Autopilot** in the left sidebar.
+2. Under **Tiers**, either leave a tier empty or pick a provider and model for it. An empty tier inherits your deployment default model and derives its reasoning effort (see [Auto tier resolution](#auto-tier-resolution)); the line under the picker shows the effective route and where it came from.
+3. In **Classifier**, keep **Local heuristics** for the instant offline path, or choose **Fast model of my provider** to let your own fast-tier model refine the classification. The **Classifier timeout, ms** field appears only in fast mode.
+4. Set **Tool failures before switching to complex** if the default of `2` does not fit your workflow.
+5. Save, then Enable. The policy applies from the next step.
 
-Routing applies from the next step. The switch itself is recorded in the session as a normal model
-change, so the timeline stays readable.
+## The panel
 
-## How the routing works
+The panel (title **Model autopilot**, sidebar entry **Autopilot**) edits the same `config` block that the profile patch holds, and shows the effective decisions rather than only the raw settings:
+
+- **State** — enabled or disabled (**Enabled**/**Disabled**), the Enable/Disable switch, and **Default model for new sessions**.
+- **Tiers** — **Light**, **Medium**, **Complex**, each picked as a provider and model, grouped by provider. Below every picker the effective route is shown as `provider / model · effort — source`, where the source is **configured**, **auto from your default model**, **your default model (no reasoning levels)**, or **not available yet**.
+- **Classifier** — **Local heuristics** or **Fast model of my provider**, plus **Classifier timeout, ms** (200–10000) when the fast model is selected.
+- **Tool failures before switching to complex** — the escalation threshold (0–20).
+- **Recent decisions** — tier, provider/model (with the reasoning effort when there is one), reason (**by request**, **after failures**, **by fast model**), classifier score, and time.
+
+## How a step is routed
 
 ```
-user message ──▶ classify text ──▶ pick tier ──▶ agent.model.select() ──▶ next step
-                     ▲                                  │
-tool results ──▶ consecutive failures ──▶ heavy ────────┘
+new user message
+      │
+      ▼
+classifier.js local score ──(classifier: fast, message ≥ 12 chars)──▶ one small request via llm.stream
+      │                                                               │ timeout / error / unclear → local verdict
+      ▼                                                               ▼
+pick tier (fast | coder | heavy) ──▶ validate ──▶ agent.model.select() ──▶ next unprepared step
+      ▲
+tool results ──▶ consecutive failures ≥ escalateAfterErrors ──▶ heavy
 ```
 
-- **Classification** reads the text of the just-inserted message and matches a keyword heuristic in
-  English and Russian. A match selects `coder`, otherwise `fast`.
-- **Failure escalation** counts consecutive tool results with `isError: true` per session. On the
-  threshold it selects `heavy` immediately, and new messages keep `heavy` until the counter resets.
-- **Reset**: a successful mutating tool call (`edit`, `write`, `apply_patch`, `edit_file`,
-  `write_file`, `apply_diff`, `bash`, `run_command`, `terminal`, `run_code`) clears the counter.
-- The selection is a **no-op** when the agent already runs the target model, so a long session does
-  not churn model changes without reason.
+- **Local heuristics first.** [classifier.js](classifier.js) is pure and synchronous: it scores intent, scope, failure traces, code structure, planning wording and length, and lets casual signals count only when nothing else fired. It returns a tier, a score and the signals that produced it. No network, no extra latency.
+- **Only your own messages route the model.** The host classifies inbox messages whose source kind is `user`. Injected context — runtime reminders, model-switch notices, subagent results, plugin messages — is ignored, because switching on a reminder would be noise.
+- **Escalation.** The host counts consecutive tool results with `isError` per session. At `escalateAfterErrors` (default `2`, `0` disables escalation) it selects the Complex (`heavy`) tier for the next step. A successful editing or shell tool call resets the counter, so escalation is not a permanent state; later messages follow the classifier again.
+- **Validation.** Before selecting, the host checks that the provider is registered with the `llm` service and that model metadata resolves (bounded at 4 seconds). An unknown provider or unavailable model is skipped and the agent step is not broken; a reasoning effort the model does not advertise is dropped instead of failing the selection.
+- **Selection.** The host calls `agent.model.select()` for the next unprepared step; when the agent already runs the exact target it skips the call. The switch is recorded in the session as a normal model change.
+- **Hot path.** A step's model is fixed before that step starts. That is why the triggering step is decided by the local heuristics: they run synchronously on message insertion, against a route cache warmed at load and after every save. (Only the very first message after a cold start, before model metadata resolves, can defer its selection to a later step.) The optional fast-model classifier, even when it answers quickly, can only change a step that has not been prepared yet — in practice a later step. It improves the classification, it does not retroactively change the triggering step.
 
-### Configuration
+### Auto tier resolution
 
-The panel writes through the profile config editor, so the row in the profile’s Cordis patch ends up
-like this:
+Leave the provider and model of a tier empty and it inherits the deployment default model — the default selection in **Settings → Models**. The tiers then differ by reasoning effort: **Light** takes the least effort the model advertises, **Complex** the most, and **Medium** the model's default effort (or the middle of its advertised list). This is what makes a zero-config start work on a default model that has several reasoning levels. Each tier row in the panel shows the resulting route and marks it as **auto from your default model**.
+
+If the default model advertises no reasoning levels, every tier resolves to the same route. There is nothing to switch between, so the plugin makes no model selection; the panel marks those tiers **your default model (no reasoning levels)**. Configure distinct models in that case.
+
+### Fast-model classifier (`classifier: fast`)
+
+When the classifier is set to the fast model, the host sends one tiny request per user message (only messages of 12 or more characters, and not while escalation is active) through the `llm` service using the fast tier of your provider — or the deployment default model when the fast tier inherits it. The request uses the prompt from [classifier.js](classifier.js) and is cut off at `classifierTimeoutMs` (default `1500`, valid 200–10000). A timeout, a provider error or an unparseable reply keeps the local verdict. A parsed verdict is applied only when it differs from the local one, the message is still the latest, and the agent is running.
+
+Because the model for a step is fixed before the step starts, the verdict can only refine a step that has not been prepared yet. The panel's recent-decisions log marks these switches **by fast model**.
+
+## Configuration
+
+The row in the profile Cordis patch. Settings saved in the panel end up in the same block, including `classifier` and `classifierTimeoutMs`:
 
 ```yaml
 - insert:
@@ -120,74 +131,86 @@ like this:
       config:
         enabled: true
         escalateAfterErrors: 2
+        classifier: local
+        classifierTimeoutMs: 1500
         tiers:
           fast:
             provider: deepseek
             model: deepseek-chat
+            reasoningEffort: ''
           coder:
             provider: deepseek
             model: deepseek-reasoner
+            reasoningEffort: ''
           heavy:
-            provider: ''
-            model: ''
+            provider: deepseek
+            model: deepseek-reasoner
+            reasoningEffort: high
 ```
 
-| Field | Meaning |
-| --- | --- |
-| `enabled` | master switch; `false` means the plugin watches nothing |
-| `escalateAfterErrors` | consecutive failures before `heavy`; `0` disables escalation |
-| `tiers.*.provider` / `tiers.*.model` | provider id and model id from your Models settings; both empty = tier skipped |
+The provider, model and effort ids above are examples for shape only: use the ids your own providers advertise in **Settings → Models**. `reasoningEffort: high` is the kind of id a model may offer; the accepted values are exactly what the model reports.
 
-## Data and privacy
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `enabled` | `false` | Master switch. While false the plugin observes nothing and never changes a model. |
+| `escalateAfterErrors` | `2` | Consecutive failing tool results in a session before the Complex tier is selected. Integer 0–20; `0` disables escalation. |
+| `classifier` | `"local"` | `"local"`: heuristic only, no model request. `"fast"`: one small classification request through the fast-tier model, with the local verdict as fallback. |
+| `classifierTimeoutMs` | `1500` | Upper bound for that request, integer 200–10000. On timeout the local verdict is used. Ignored when `classifier: local`. |
+| `tiers.fast.provider` / `tiers.fast.model` | `""` | Provider id and model id from **Settings → Models**. Set both or neither; an empty pair means auto resolution. |
+| `tiers.fast.reasoningEffort` | `""` | Optional effort id the model advertises. The panel's tier picker chooses provider and model only; set the effort here. Empty = the model's default effort, and for an inherited tier the plugin derives the effort from the model. |
+| `tiers.coder.*` | — | Same three keys for the Medium tier. |
+| `tiers.heavy.*` | — | Same three keys for the Complex tier. |
 
-The panel talks to the Host half over an authenticated same-origin route
-(`/api/model-autopilot/state`, `/api/model-autopilot/settings`). No conversation text, no prompts and
-no provider credentials leave the machine; the plugin has no network code of its own.
-
-## Honest limitations
-
-This is a small, deliberately simple plugin. What it is **not**:
-
-- **The classifier is a keyword heuristic.** Russian and English only, no model call, no session
-  context. “Fix the typo” is classified like “fix the failing test”. Unusual phrasings fall back to
-  `fast`.
-- **Switching models mid-session can invalidate the provider’s prompt cache**, which costs tokens
-  on the next request. That is the price of routing; keep the number of switches low by making the
-  `fast` tier close in price to `coder`.
-- **Escalation is naive**: any failing tool result counts, including a `grep` with no matches.
-- **It affects every session in the profile**, subagent sessions included, while it is enabled.
-- **Heavy is a dead end by design** — it does not de-escalate on its own; the counter reset on a
-  successful edit or command does that.
-- **No per-session policy yet** (work in progress).
+Provider and model are always set together: a tier with one set and the other empty is invalid and the host rejects the save. `reasoningEffort` is optional everywhere, and the bundled patch ships it as an empty string.
 
 ## Troubleshooting
 
-| Symptom | Cause |
+| Symptom | Cause / what to try |
 | --- | --- |
-| “No models are advertised by the registered providers” | no provider configured yet: **Settings → Models** |
-| Panel saves but the model never changes | every tier is empty, or the plugin is disabled |
-| The sidebar entry is missing | the bundle is installed but the Web client was not reloaded |
-| It keeps choosing `fast` for complex prompts | the request wording does not match the heuristic; put a shared model in `fast` and `coder` for now |
+| The model never changes | The plugin is disabled; every tier is empty and the default model has no reasoning levels; the agent already runs the exact target (a switch would be a no-op); or a configured provider is not registered / its model metadata is unavailable, so the target is skipped. Check the recent-decisions log in the panel. |
+| The panel says no models are advertised | No provider is configured in **Settings → Models**, or this profile lacks the `llm` service. Configure a provider and reload. |
+| A configured provider does not appear | The list comes from the `llm` service; a provider that failed to initialize is not listed. Recheck **Settings → Models** and the DSH logs. |
+| Tiers show “your default model (no reasoning levels)” | The deployment default model advertises no reasoning efforts, so all tiers collapse to one route and no switch happens. Pick distinct provider/model pairs per tier. |
+| Saving in the panel fails | The profile lacks the `configEditor` service (heavily customized profile). Set the row config in the profile patch directly. |
+| No sidebar entry | The package is installed but the Web client was not reloaded. Reload the client. |
+| Complex requests still go to Light | Classification is approximate, and in fast mode a verdict can only apply to a later step. Check the score and signals in the recent-decisions log; while testing, put the same model in Light and Medium. |
+| Self-test fails | Run `node verify.mjs .` from the package directory with Node.js 20+. The test is offline: it exercises the classifier, the host routes, zero-config derivation, escalation, the fast-model path, settings validation, and the client registration and locales. |
 
-## Development
+## Data and privacy
 
-No build, no bundler, no dependencies — two ESM files:
+- No third-party keys, accounts, telemetry or hardcoded endpoints.
+- In `local` mode the message text is scored in memory only; the plugin has no network code of its own.
+- In `fast` mode one small classification request goes through DSH's own `llm` service to the provider and model resolved for the fast tier. That may be your default model, so normally it is the same provider the session already uses; no new destination appears.
+- The panel talks to the host over the authenticated same-origin routes `/api/model-autopilot/state` and `/api/model-autopilot/settings`. Settings are written to the profile through `configEditor`; the bundle never rewrites `cordis.patch.yml` itself.
+
+## Limitations
+
+- **Classification is a heuristic approximation.** The local classifier is keyword, structure and length scoring, not an understanding of the request. It will sometimes pick the wrong tier; the recent-decisions log shows the score and which signals fired.
+- **A step's model cannot be changed after the step starts.** The model is fixed before the step, so a switch cannot be undone mid-step. The fast-model classifier cannot retroactively change the step that triggered it either: local heuristics decide the first step, and the verdict can only refine a later unprepared step.
+- **Fast mode costs an extra request.** One small LLM call per message (12+ characters) plus up to `classifierTimeoutMs` of wait, on top of the normal step. Leave it on **Local heuristics** if that is not worth the accuracy.
+- **Escalation is naive.** Any tool result with `isError` counts, including failures that are not really a loop (a search with no matches, a deliberately failing command). A successful editing or shell call resets the counter.
+- **Auto resolution depends on the default model.** If it exposes no reasoning efforts, the tiers collapse to the same route and the plugin does not switch. Configure explicit models for a meaningful split.
+- **Switching models can invalidate the provider's prompt cache**, so a switch can cost more tokens on the next request. That is the price of routing; a cheaper Light tier usually still wins over a long session.
+- **It observes every live agent in the profile while enabled.** Only messages whose source kind is `user` are classified; messages injected by other plugins are skipped. There is no per-session policy yet.
+
+## Architecture
 
 | File | Role |
 | --- | --- |
-| `index.js` | Host half: events, routing, the two authenticated routes, config writes |
-| `client.js` | Web client half: `sidebar.panellist` icon, the panel, the locale, the styles |
-| `cordis.patch.yml` | the bundle patch that inserts the row, disabled by default |
-| `locale/*.json` | panel title and description for the catalog, en and ru |
-| `verify.mjs` | offline functional test of both halves (mocked `ctx`, no browser) |
+| [index.js](index.js) | Host half: registers the exact Fetch routes `/api/model-autopilot/state` and `/api/model-autopilot/settings`, listens to `agent/inbox/inserted`, tracks failures, derives and validates tier targets from the deployment default model, calls `agent.model.select()`, and persists config through `configEditor`. |
+| [classifier.js](classifier.js) | Pure scoring and no I/O: the local heuristic, the fast-mode prompt and the verdict parser. |
+| [client.js](client.js) | Client half loaded through `window.__ModuleLoader__`: the `sidebar.panellist` panel with the effective-route lines and classifier controls, its styles and the en/ru dictionaries. |
+| [cordis.patch.yml](cordis.patch.yml) | Bundle patch that inserts the `model-autopilot` row, disabled by default. |
+| [locale/en.json](locale/en.json), [locale/ru.json](locale/ru.json) | Panel title and description for the catalog and the UI. |
+| [verify.mjs](verify.mjs) | Offline functional self-test of the classifier, both halves and the settings contract. |
+| [package.json](package.json) | Package metadata, `dsh.bundle.patch`, `engines.node >= 20`, client entry and exports. |
+
+No build step and no runtime dependencies: plain ESM loaded by DSH. After changing anything, run the offline check:
 
 ```bash
-npm test        # or: node verify.mjs
+node verify.mjs .
 ```
-
-`verify.mjs` boots the Host half with a stub context and asserts routing, persistence, both Fetch
-routes, the client registration, the locales and one panel render.
 
 ## License
 
-MIT © 2026 Denisplokhikh
+MIT — see [LICENSE](LICENSE). Copyright (c) 2026 Denis Plokhikh.

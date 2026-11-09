@@ -4,13 +4,18 @@
       config:
         enabled: false
         escalateAfterErrors: 2
+        classifier: local
+        classifierTimeoutMs: 1500
         tiers:
           fast:
             provider: ''
             model: ''
+            reasoningEffort: ''
           coder:
             provider: ''
             model: ''
+            reasoningEffort: ''
           heavy:
             provider: ''
             model: ''
+            reasoningEffort: ''

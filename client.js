@@ -16,7 +16,7 @@ window.__ModuleLoader__.load({
     const en = {
       'panel.label': 'Autopilot',
       'panel.title': 'Model autopilot',
-      'panel.subtitle': 'Switches the agent model for every step: a fast tier for ordinary turns, the coder tier for complex requests, and the heavy tier after repeated tool failures.',
+      'panel.subtitle': 'Switches the agent model for every step: light for ordinary turns, medium for focused code work, complex for multi-step tasks and after repeated tool failures. Only the providers you configured are used.',
       'status.label': 'State',
       'status.on': 'Enabled',
       'status.off': 'Disabled',
@@ -25,16 +25,26 @@ window.__ModuleLoader__.load({
       'toggle.disable': 'Disable',
       'current.label': 'Default model for new sessions',
       'current.empty': 'not configured',
+      'current.hint': 'Tiers left empty inherit this route; their effort is derived from the model itself.',
       'models.empty': 'No models are advertised by the registered providers. Configure a provider in Settings → Models first.',
       'tiers.title': 'Tiers',
-      'tiers.hint': 'Every tier is a provider and a model. Leave a tier empty to skip it; the plugin falls back to the first configured tier.',
-      'tier.fast': 'Fast',
-      'tier.fast.hint': 'Ordinary turns and short questions.',
-      'tier.coder': 'Coder',
-      'tier.coder.hint': 'Architecture, refactoring, fixes, and other complex requests.',
-      'tier.heavy': 'Heavy',
-      'tier.heavy.hint': 'After the failure threshold, to leave an error loop.',
-      'errors.label': 'Tool failures before switching to heavy',
+      'tiers.hint': 'A tier is a provider, a model and an optional reasoning effort. Leave a tier empty and the plugin derives it from your default model: light takes the least effort, heavy the most. No extra API key is needed.',
+      'tier.fast': 'Light',
+      'tier.fast.hint': 'Ordinary turns, short questions, small lookups.',
+      'tier.coder': 'Medium',
+      'tier.coder.hint': 'Focused code changes, debugging, reviews.',
+      'tier.heavy': 'Complex',
+      'tier.heavy.hint': 'Architecture, migrations, wide refactors, and error loops.',
+      'effective.config': 'configured',
+      'effective.auto': 'auto from your default model',
+      'effective.default': 'your default model (no reasoning levels)',
+      'effective.none': 'not available yet',
+      'classifier.label': 'Classifier',
+      'classifier.hint': 'Local heuristics are instant, free and offline. "Fast model" additionally asks the fast tier of your own provider once per message; the local verdict stays the fallback.',
+      'classifier.local': 'Local heuristics',
+      'classifier.fast': 'Fast model of my provider',
+      'classifier.timeout': 'Classifier timeout, ms',
+      'errors.label': 'Tool failures before switching to complex',
       'errors.hint': 'Consecutive failing tool results per session; a successful edit or command resets the counter.',
       'save': 'Save',
       'saving': 'Saving…',
@@ -47,6 +57,8 @@ window.__ModuleLoader__.load({
       'recent.empty': 'No decisions yet. Enable the autopilot and start a session.',
       'reason.intent': 'by request',
       'reason.errors': 'after failures',
+      'reason.classifier': 'by fast model',
+      'recent.score': 'score',
       'recent.at': 'time',
       'note': 'The panel talks to the Host only over the authenticated same-origin route; no data leaves this machine.',
     };
@@ -54,7 +66,7 @@ window.__ModuleLoader__.load({
     const ru = {
       'panel.label': 'Автопилот',
       'panel.title': 'Автопилот моделей',
-      'panel.subtitle': 'Переключает модель агента на каждом шаге: быстрый уровень для обычных ходов, уровень для кода для сложных запросов и тяжёлый — после повторяющихся ошибок инструментов.',
+      'panel.subtitle': 'Переключает модель агента на каждом шаге: лёгкий — для обычных ходов, средний — для точечной работы с кодом, сложный — для многошаговых задач и после повторяющихся ошибок. Используются только ваши провайдеры.',
       'status.label': 'Состояние',
       'status.on': 'Включён',
       'status.off': 'Выключен',
@@ -63,16 +75,26 @@ window.__ModuleLoader__.load({
       'toggle.disable': 'Выключить',
       'current.label': 'Модель по умолчанию для новых сессий',
       'current.empty': 'не задана',
+      'current.hint': 'Пустые уровни наследуют этот маршрут; их усилие выводится из самой модели.',
       'models.empty': 'Провайдеры не сообщают моделей. Сначала настройте провайдера: Настройки → Модели.',
       'tiers.title': 'Уровни',
-      'tiers.hint': 'Уровень — это провайдер и модель. Пустой уровень пропускается, плагин берёт первый настроенный.',
-      'tier.fast': 'Быстрый',
-      'tier.fast.hint': 'Обычные ходы и короткие вопросы.',
-      'tier.coder': 'Для кода',
-      'tier.coder.hint': 'Архитектура, рефакторинг, исправления и другие сложные запросы.',
-      'tier.heavy': 'Тяжёлый',
-      'tier.heavy.hint': 'После порога ошибок — чтобы выйти из цикла.',
-      'errors.label': 'Ошибок инструментов до переключения на тяжёлый',
+      'tiers.hint': 'Уровень — это провайдер, модель и необязательное усилие рассуждения. Оставьте уровень пустым, и плагин выведет его из модели по умолчанию: лёгкий возьмёт минимальное усилие, сложный — максимальное. Дополнительный API-ключ не нужен.',
+      'tier.fast': 'Лёгкий',
+      'tier.fast.hint': 'Обычные ходы, короткие вопросы, небольшие справки.',
+      'tier.coder': 'Средний',
+      'tier.coder.hint': 'Точечные правки кода, отладка, ревью.',
+      'tier.heavy': 'Сложный',
+      'tier.heavy.hint': 'Архитектура, миграции, широкий рефакторинг и циклы ошибок.',
+      'effective.config': 'задан вручную',
+      'effective.auto': 'авто от модели по умолчанию',
+      'effective.default': 'модель по умолчанию (без уровней рассуждения)',
+      'effective.none': 'пока недоступно',
+      'classifier.label': 'Классификатор',
+      'classifier.hint': 'Локальные эвристики мгновенны, бесплатны и работают без сети. «Быстрая модель» дополнительно спрашивает лёгкий уровень вашего провайдера один раз на сообщение; локальный вердикт остаётся запасным.',
+      'classifier.local': 'Локальные эвристики',
+      'classifier.fast': 'Быстрая модель моего провайдера',
+      'classifier.timeout': 'Таймаут классификатора, мс',
+      'errors.label': 'Ошибок инструментов до переключения на сложный',
       'errors.hint': 'Подряд идущие неудачные результаты инструментов на сессию; успешная правка или команда сбрасывает счётчик.',
       'save': 'Сохранить',
       'saving': 'Сохранение…',
@@ -85,6 +107,8 @@ window.__ModuleLoader__.load({
       'recent.empty': 'Решений пока нет. Включите автопилот и начните сессию.',
       'reason.intent': 'по запросу',
       'reason.errors': 'после ошибок',
+      'reason.classifier': 'по быстрой модели',
+      'recent.score': 'балл',
       'recent.at': 'время',
       'note': 'Панель общается с Host только через аутентифицированный маршрут того же источника; данные не покидают машину.',
     };
@@ -216,6 +240,8 @@ window.__ModuleLoader__.load({
             setDraft((current) => current !== null ? current : {
               enabled: data.enabled === true,
               escalateAfterErrors: Number.isInteger(data.escalateAfterErrors) ? data.escalateAfterErrors : 2,
+              classifier: data.classifier === 'fast' ? 'fast' : 'local',
+              classifierTimeoutMs: Number.isInteger(data.classifierTimeoutMs) ? data.classifierTimeoutMs : 1500,
               tiers: data.tiers !== null && typeof data.tiers === 'object' ? data.tiers : {},
             });
           } catch (cause) {
@@ -236,6 +262,18 @@ window.__ModuleLoader__.load({
       const groups = groupModels(models);
       const currentLabel = formatSelection(remote !== null ? remote.current : null);
       const recent = remote !== null && Array.isArray(remote.recent) ? remote.recent : [];
+      const effective = remote !== null && remote.effective !== null && typeof remote.effective === 'object' ? remote.effective : {};
+
+      const describeEffective = (tier) => {
+        const target = effective !== null && effective[tier] !== null && typeof effective[tier] === 'object' ? effective[tier] : null;
+        if (target === null || typeof target.provider !== 'string' || target.provider === '' || typeof target.model !== 'string' || target.model === '') {
+          return t('effective.none');
+        }
+        const route = formatSelection(target) || `${target.provider} / ${target.model}`;
+        const effort = typeof target.reasoningEffort === 'string' && target.reasoningEffort !== '' ? ` · ${target.reasoningEffort}` : '';
+        const source = target.source === 'config' ? t('effective.config') : target.source === 'auto' ? t('effective.auto') : t('effective.default');
+        return `${route}${effort} — ${source}`;
+      };
       const known = new Set(models.map((model) => `${model.provider}\u0000${model.id}`));
 
       const updateTier = (tier, value) => {
@@ -250,9 +288,12 @@ window.__ModuleLoader__.load({
         setBusy(true);
         setNotice('');
         setError('');
+        const timeout = Number(draft.classifierTimeoutMs);
         const body = {
           enabled: nextEnabled === undefined ? draft.enabled === true : nextEnabled,
           escalateAfterErrors: Number(draft.escalateAfterErrors),
+          classifier: draft.classifier === 'fast' ? 'fast' : 'local',
+          classifierTimeoutMs: Number.isInteger(timeout) && timeout >= 200 && timeout <= 10000 ? timeout : 1500,
           tiers: draft.tiers,
         };
         try {
@@ -304,6 +345,7 @@ window.__ModuleLoader__.load({
                 }, model.name || model.id)),
               )),
             ),
+            h('div', { className: 'ma-muted', style: { marginTop: '6px', fontSize: '11px' } }, describeEffective(tier)),
           ),
         );
       };
@@ -345,6 +387,45 @@ window.__ModuleLoader__.load({
               TIERS.map(renderTier),
               h('div', { className: 'ma-row' },
                 h('div', null,
+                  h('div', { className: 'ma-tier-name' }, t('classifier.label')),
+                  h('div', { className: 'ma-muted' }, t('classifier.hint')),
+                ),
+                h('div', null,
+                  h('select', {
+                    className: 'ma-select',
+                    value: draft === null ? 'local' : draft.classifier === 'fast' ? 'fast' : 'local',
+                    disabled: draft === null,
+                    'aria-label': t('classifier.label'),
+                    onChange: (event) => {
+                      const next = event.target.value === 'fast' ? 'fast' : 'local';
+                      setDraft((currentContext) => currentContext === null ? currentContext : { ...currentContext, classifier: next });
+                    },
+                  },
+                    h('option', { value: 'local' }, t('classifier.local')),
+                    h('option', { value: 'fast' }, t('classifier.fast')),
+                  ),
+                  draft !== null && draft.classifier === 'fast' ? h('input', {
+                    className: 'ma-input',
+                    type: 'number',
+                    min: 200,
+                    max: 10000,
+                    step: 100,
+                    'aria-label': t('classifier.timeout'),
+                    title: t('classifier.timeout'),
+                    style: { marginTop: '8px' },
+                    value: draft.classifierTimeoutMs,
+                    onChange: (event) => {
+                      const next = Number(event.target.value);
+                      setDraft((currentContext) => currentContext === null ? currentContext : {
+                        ...currentContext,
+                        classifierTimeoutMs: Number.isFinite(next) ? next : 1500,
+                      });
+                    },
+                  }) : null,
+                ),
+              ),
+              h('div', { className: 'ma-row' },
+                h('div', null,
                   h('div', { className: 'ma-tier-name' }, t('errors.label')),
                   h('div', { className: 'ma-muted' }, t('errors.hint')),
                 ),
@@ -383,8 +464,9 @@ window.__ModuleLoader__.load({
                 : h('ul', { className: 'ma-list' },
                     recent.map((entry, index) => h('li', { key: `${entry.at}-${index}` },
                       h('span', { className: 'ma-chip' }, t(`tier.${entry.tier}`) ),
-                      h('span', null, `${entry.provider} / ${entry.model}`),
-                      h('span', null, t(entry.reason === 'errors' ? 'reason.errors' : 'reason.intent')),
+                      h('span', null, `${entry.provider} / ${entry.model}${typeof entry.reasoningEffort === 'string' && entry.reasoningEffort !== '' ? ` · ${entry.reasoningEffort}` : ''}`),
+                      h('span', null, t(entry.reason === 'errors' ? 'reason.errors' : entry.reason === 'classifier' ? 'reason.classifier' : 'reason.intent')),
+                      typeof entry.score === 'number' ? h('span', null, `${t('recent.score')} ${entry.score}`) : null,
                       h('span', null, new Date(entry.at).toLocaleTimeString()),
                     )),
                   ),
