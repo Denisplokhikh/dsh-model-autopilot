@@ -49,7 +49,7 @@
         "en": "Sidebar panel that switches the agent model per step: light for ordinary turns, medium for focused code work, complex for multi-step work and after repeated tool failures.",
         "ru": "Панель в боковой панели: переключает модель агента на каждом шаге — лёгкая для обычных ходов, средняя для работы с кодом, сложная для многошаговых задач и после повторяющихся ошибок инструментов."
       },
-      "icon": "https://raw.githubusercontent.com/Denisplokhikh/dsh-model-autopilot/48a3637a29619fcd7433cbd8897240d76e83c061/icon.svg",
+      "icon": "https://raw.githubusercontent.com/Denisplokhikh/dsh-model-autopilot/61fbaa8bb6d4c563af299f1fc76a061c21dfea4d/icon.svg",
       "author": "Denisplokhikh",
       "homepage": "https://github.com/Denisplokhikh/dsh-model-autopilot",
       "repository": {
@@ -74,11 +74,11 @@
       "versions": [
         {
           "version": "1.1.1",
-          "publishTimestamp": 1794199890,
+          "publishTimestamp": 1794200100,
           "source": {
             "type": "git",
             "url": "https://github.com/Denisplokhikh/dsh-model-autopilot",
-            "commit": "48a3637a29619fcd7433cbd8897240d76e83c061"
+            "commit": "61fbaa8bb6d4c563af299f1fc76a061c21dfea4d"
           }
         }
       ]
