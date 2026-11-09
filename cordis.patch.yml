@@ -1,0 +1,16 @@
+- insert:
+    - id: model-autopilot
+      name: 'dsh-model-autopilot'
+      config:
+        enabled: false
+        escalateAfterErrors: 2
+        tiers:
+          fast:
+            provider: ''
+            model: ''
+          coder:
+            provider: ''
+            model: ''
+          heavy:
+            provider: ''
+            model: ''

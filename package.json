@@ -1,0 +1,57 @@
+{
+  "name": "dsh-model-autopilot",
+  "version": "1.0.0",
+  "description": "DSH plugin: a left-sidebar panel that switches the agent model per step — fast for ordinary turns, coder for complex tasks, heavy after repeated tool failures.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Denisplokhikh",
+  "homepage": "https://github.com/Denisplokhikh/dsh-model-autopilot#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Denisplokhikh/dsh-model-autopilot.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Denisplokhikh/dsh-model-autopilot/issues"
+  },
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "dsh-plugin",
+    "plugin",
+    "model-routing",
+    "autopilot",
+    "sidebar",
+    "llm"
+  ],
+  "scripts": {
+    "test": "node verify.mjs"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "README.md",
+    "README.ru.md",
+    "LICENSE"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-sidebar"
+      ]
+    }
+  }
+}

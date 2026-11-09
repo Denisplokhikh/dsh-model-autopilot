@@ -1,0 +1,14 @@
+node_modules/
+npm-debug.log*
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log
+
+# editor and OS noise
+.idea/
+.vscode/
+*.swp
+
+# local screenshots that are not part of the published docs
+docs/local-*

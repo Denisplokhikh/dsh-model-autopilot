@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Model autopilot",
+    "description": "A left-sidebar panel that switches the agent model for each step by task and tool failures."
+  }
+}
