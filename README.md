@@ -52,8 +52,8 @@ your configured providers, the failure threshold, and the log of the last decisi
 DSH can read plugin catalogs — JSON indexes a user adds by URL. This repository ships one:
 `index.json`.
 
-1. Enable the **plugin market** bundle in your profile (it ships with DSH but is off by default) and
-   open the **Discover** tab.
+1. Enable the optional bundle `@deepseek-ai/dsh-experimental-plugin-market-bundle` in
+   **Settings → Plugins** (it ships with DSH, off by default) and open the **Discover** tab.
 2. Add this index URL in the catalog settings:
 
    ```
