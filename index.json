@@ -1,0 +1,87 @@
+{
+  "format": 1,
+  "title": {
+    "en": "DSH plugins by Denisplokhikh",
+    "ru": "Плагины DSH от Denisplokhikh"
+  },
+  "description": {
+    "en": "Community catalog of DSH plugins. Add this index URL in the Discover tab.",
+    "ru": "Небольшой каталог плагинов DSH. Добавьте ссылку на этот индекс во вкладке Discover."
+  },
+  "metadata": {
+    "categories": {
+      "models": {
+        "title": {
+          "en": "Models & routing",
+          "ru": "Модели и маршрутизация"
+        }
+      },
+      "ui": {
+        "title": {
+          "en": "Sidebar & UI",
+          "ru": "Боковая панель и интерфейс"
+        }
+      }
+    },
+    "labels": {
+      "beta": {
+        "title": {
+          "en": "Beta",
+          "ru": "Бета"
+        }
+      },
+      "no-deps": {
+        "title": {
+          "en": "No dependencies",
+          "ru": "Без зависимостей"
+        }
+      }
+    }
+  },
+  "plugins": [
+    {
+      "name": "dsh-model-autopilot",
+      "title": {
+        "en": "Model Autopilot",
+        "ru": "Автопилот моделей"
+      },
+      "description": {
+        "en": "Left-sidebar panel that switches the agent model per step: fast for ordinary turns, coder for complex requests, heavy after repeated tool failures.",
+        "ru": "Панель в левой боковой панели: переключает модель агента на каждом шаге — быстрая для обычных ходов, для кода на сложных запросах, тяжёлая после повторяющихся ошибок инструментов."
+      },
+      "icon": "https://raw.githubusercontent.com/Denisplokhikh/dsh-model-autopilot/3b5d41ebe43a7297d9d2875308ac0d1abf8d8cea/icon.svg",
+      "author": "Denisplokhikh",
+      "homepage": "https://github.com/Denisplokhikh/dsh-model-autopilot",
+      "repository": {
+        "url": "https://github.com/Denisplokhikh/dsh-model-autopilot"
+      },
+      "metadata": {
+        "category": "models",
+        "keywords": [
+          "model routing",
+          "autopilot",
+          "reasoning",
+          "cost",
+          "sidebar",
+          "deepseek"
+        ],
+        "labels": [
+          "beta",
+          "no-deps"
+        ],
+        "sortKeys": {}
+      },
+      "versions": [
+        {
+          "version": "1.0.0",
+          "publishTimestamp": 1794191841,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/Denisplokhikh/dsh-model-autopilot",
+            "commit": "3b5d41ebe43a7297d9d2875308ac0d1abf8d8cea"
+          }
+        }
+      ]
+    }
+  ]
+}
