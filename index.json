@@ -46,8 +46,8 @@
         "ru": "Автопилот моделей"
       },
       "description": {
-        "en": "Left-sidebar panel that switches the agent model per step: fast for ordinary turns, coder for complex requests, heavy after repeated tool failures.",
-        "ru": "Панель в левой боковой панели: переключает модель агента на каждом шаге — быстрая для обычных ходов, для кода на сложных запросах, тяжёлая после повторяющихся ошибок инструментов."
+        "en": "Sidebar panel that switches the agent model per step: light for ordinary turns, medium for focused code work, complex for multi-step work and after repeated tool failures.",
+        "ru": "Панель в боковой панели: переключает модель агента на каждом шаге — лёгкая для обычных ходов, средняя для работы с кодом, сложная для многошаговых задач и после повторяющихся ошибок инструментов."
       },
       "icon": "https://raw.githubusercontent.com/Denisplokhikh/dsh-model-autopilot/48a3637a29619fcd7433cbd8897240d76e83c061/icon.svg",
       "author": "Denisplokhikh",
