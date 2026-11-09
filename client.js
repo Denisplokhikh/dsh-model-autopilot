@@ -44,6 +44,11 @@ window.__ModuleLoader__.load({
       'classifier.local': 'Local heuristics',
       'classifier.fast': 'Fast model of my provider',
       'classifier.timeout': 'Classifier timeout, ms',
+      'classifierModel.label': 'Model for classification',
+      'classifierModel.hint': 'The model that answers the classification request. Pick a cheap model here to keep classification predictable; empty means the Light tier.',
+      'classifierModel.fast': 'Light tier (default)',
+      'classifierModel.missing': 'not in the catalog',
+      'classifierModel.effective': 'Requests go to',
       'errors.label': 'Tool failures before switching to complex',
       'errors.hint': 'Consecutive failing tool results per session; a successful edit or command resets the counter.',
       'save': 'Save',
@@ -94,6 +99,11 @@ window.__ModuleLoader__.load({
       'classifier.local': 'Локальные эвристики',
       'classifier.fast': 'Быстрая модель моего провайдера',
       'classifier.timeout': 'Таймаут классификатора, мс',
+      'classifierModel.label': 'Модель для классификации',
+      'classifierModel.hint': 'Модель, которая отвечает на запрос классификации. Укажите дешёвую модель, чтобы классификация была предсказуемой; пусто — используется Лёгкий уровень.',
+      'classifierModel.fast': 'Лёгкий уровень (по умолчанию)',
+      'classifierModel.missing': 'нет в каталоге',
+      'classifierModel.effective': 'Запросы идут в',
       'errors.label': 'Ошибок инструментов до переключения на сложный',
       'errors.hint': 'Подряд идущие неудачные результаты инструментов на сессию; успешная правка или команда сбрасывает счётчик.',
       'save': 'Сохранить',
@@ -242,6 +252,12 @@ window.__ModuleLoader__.load({
               escalateAfterErrors: Number.isInteger(data.escalateAfterErrors) ? data.escalateAfterErrors : 2,
               classifier: data.classifier === 'fast' ? 'fast' : 'local',
               classifierTimeoutMs: Number.isInteger(data.classifierTimeoutMs) ? data.classifierTimeoutMs : 1500,
+              classifierModel: data.classifierModel !== null && typeof data.classifierModel === 'object'
+                ? {
+                    provider: typeof data.classifierModel.provider === 'string' ? data.classifierModel.provider : '',
+                    model: typeof data.classifierModel.model === 'string' ? data.classifierModel.model : '',
+                  }
+                : { provider: '', model: '' },
               tiers: data.tiers !== null && typeof data.tiers === 'object' ? data.tiers : {},
             });
           } catch (cause) {
@@ -274,6 +290,19 @@ window.__ModuleLoader__.load({
         const source = target.source === 'config' ? t('effective.config') : target.source === 'auto' ? t('effective.auto') : t('effective.default');
         return `${route}${effort} — ${source}`;
       };
+
+      const classifierDraft = draft !== null && draft.classifierModel !== null && typeof draft.classifierModel === 'object'
+        ? draft.classifierModel
+        : { provider: '', model: '' };
+      const classifierMissing = classifierDraft.provider !== ''
+        && !models.some((model) => model.provider === classifierDraft.provider && model.id === classifierDraft.model);
+      const classifierFallback = effective !== null && effective.fast !== null && typeof effective.fast === 'object' ? effective.fast : null;
+      const classifierTarget = classifierDraft.provider !== '' && classifierDraft.model !== '' ? classifierDraft : classifierFallback;
+      const describeClassifier = () => {
+        if (classifierTarget === null) return t('effective.none');
+        const route = formatSelection(classifierTarget) || `${classifierTarget.provider} / ${classifierTarget.model}`;
+        return classifierMissing ? `${route} · ${t('classifierModel.missing')}` : route;
+      };
       const known = new Set(models.map((model) => `${model.provider}\u0000${model.id}`));
 
       const updateTier = (tier, value) => {
@@ -294,6 +323,12 @@ window.__ModuleLoader__.load({
           escalateAfterErrors: Number(draft.escalateAfterErrors),
           classifier: draft.classifier === 'fast' ? 'fast' : 'local',
           classifierTimeoutMs: Number.isInteger(timeout) && timeout >= 200 && timeout <= 10000 ? timeout : 1500,
+          classifierModel: draft.classifierModel !== null && typeof draft.classifierModel === 'object'
+            ? {
+                provider: typeof draft.classifierModel.provider === 'string' ? draft.classifierModel.provider : '',
+                model: typeof draft.classifierModel.model === 'string' ? draft.classifierModel.model : '',
+              }
+            : { provider: '', model: '' },
           tiers: draft.tiers,
         };
         try {
@@ -422,6 +457,28 @@ window.__ModuleLoader__.load({
                       });
                     },
                   }) : null,
+                  draft !== null && draft.classifier === 'fast' ? h('div', null,
+                    h('select', {
+                      className: 'ma-select',
+                      style: { marginTop: '8px' },
+                      value: encodeTier(classifierDraft),
+                      'aria-label': t('classifierModel.label'),
+                      onChange: (event) => {
+                        const next = decodeTier(event.target.value);
+                        setDraft((currentContext) => currentContext === null ? currentContext : { ...currentContext, classifierModel: next });
+                      },
+                    },
+                      h('option', { value: encodeTier({ provider: '', model: '' }) }, t('classifierModel.fast')),
+                      classifierMissing ? h('option', { value: encodeTier(classifierDraft) }, `${classifierDraft.provider} / ${classifierDraft.model}`) : null,
+                      groups.map((group) => h('optgroup', { key: group.provider, label: group.name },
+                        group.models.map((model) => h('option', {
+                          key: `${model.provider}\u0000${model.id}`,
+                          value: encodeTier({ provider: model.provider, model: model.id }),
+                        }, model.name || model.id)),
+                      )),
+                    ),
+                    h('div', { className: 'ma-muted', style: { marginTop: '6px', fontSize: '11px' } }, `${t('classifierModel.effective')}: ${describeClassifier()}`),
+                  ) : null,
                 ),
               ),
               h('div', { className: 'ma-row' },

@@ -69,7 +69,7 @@ const DEFAULT_TIERS = {
  * Missing or malformed values fall back to the disabled default, so a broken
  * patch row never starts silently switching models.
  * @param {unknown} config - raw row config supplied by the Loader.
- * @returns {{ enabled: boolean, escalateAfterErrors: number, classifier: string, classifierTimeoutMs: number, tiers: typeof DEFAULT_TIERS }} normalized config.
+ * @returns {{ enabled: boolean, escalateAfterErrors: number, classifier: string, classifierTimeoutMs: number, classifierModel: { provider: string, model: string }, tiers: typeof DEFAULT_TIERS }} normalized config.
  */
 function normalizeConfig(config) {
   const raw = config !== null && typeof config === 'object' ? config : {}
@@ -85,11 +85,19 @@ function normalizeConfig(config) {
   }
   const threshold = Number(raw.escalateAfterErrors)
   const timeout = Number(raw.classifierTimeoutMs)
+  const rawClassifierModel = raw.classifierModel !== null && typeof raw.classifierModel === 'object' ? raw.classifierModel : {}
+  let classifierProvider = typeof rawClassifierModel.provider === 'string' ? rawClassifierModel.provider.trim() : ''
+  let classifierModelId = typeof rawClassifierModel.model === 'string' ? rawClassifierModel.model.trim() : ''
+  if (classifierProvider === '' || classifierModelId === '') {
+    classifierProvider = ''
+    classifierModelId = ''
+  }
   return {
     enabled: raw.enabled === true,
     escalateAfterErrors: Number.isInteger(threshold) && threshold >= 0 && threshold <= 20 ? threshold : 2,
     classifier: CLASSIFIERS.includes(raw.classifier) ? raw.classifier : 'local',
     classifierTimeoutMs: Number.isInteger(timeout) && timeout >= 200 && timeout <= 10000 ? timeout : DEFAULT_CLASSIFIER_TIMEOUT_MS,
+    classifierModel: { provider: classifierProvider, model: classifierModelId },
     tiers,
   }
 }
@@ -498,6 +506,28 @@ export function apply(ctx, config = {}) {
   }
 
   /**
+   * Resolve the route the optional fast-model classifier talks to: an
+   * explicitly configured classifier model first, then the Light tier, then
+   * the deployment default. Every candidate is validated, so the classifier
+   * can never address a model the provider does not advertise.
+   * @returns {Promise<{ provider: string, model: string, reasoningEffort?: string } | undefined>} classifier route.
+   */
+  const resolveClassifierSelection = async () => {
+    const configured = cleanSelection(settings.classifierModel)
+    if (configured !== undefined) {
+      const validated = await validateTarget(configured)
+      if (validated !== undefined) return validated
+    }
+    const targets = await ensureTargets()
+    const fromFast = cleanSelection(targets.fast)
+    if (fromFast !== undefined) {
+      const validated = await validateTarget(fromFast)
+      if (validated !== undefined) return validated
+    }
+    return defaultSelection()
+  }
+
+  /**
    * Apply one already-validated selection. Reading the current choice first
    * keeps an unchanged pick a no-op.
    * @param {{ id: unknown, model?: { select?: Function, current?: Function } }} agent - live agent handle.
@@ -594,10 +624,16 @@ export function apply(ctx, config = {}) {
   const smartClassify = async (agent, text, token, heuristicTier) => {
     const llm = service('llm')
     if (llm === undefined || typeof llm.stream !== 'function') return
-    const targets = await ensureTargets()
-    const route = cleanSelection(targets.fast) ?? defaultSelection()
+    const route = await resolveClassifierSelection()
     if (route === undefined) return
     if (!providerIds().has(route.provider)) return
+    // OpenCode Go and similar providers route (and attribute) a request by its
+    // conversation header; without `sessionId` they reject it as missing_session.
+    const sessionId = agent.session !== undefined && agent.session !== null && typeof agent.session.id === 'string' && agent.session.id !== ''
+      ? agent.session.id
+      : agent.id === undefined || agent.id === null
+        ? undefined
+        : String(agent.id)
     const controller = typeof AbortController === 'function' ? new AbortController() : undefined
     const timer = setTimeout(() => {
       try {
@@ -626,6 +662,7 @@ export function apply(ctx, config = {}) {
         ...(leastEffort === undefined ? {} : { reasoningEffort: leastEffort }),
         messages: [{ role: 'user', content: [{ type: 'text', text: classifierPrompt(text) }] }],
         maxTokens: CLASSIFIER_MAX_TOKENS,
+        ...(sessionId === undefined ? {} : { sessionId }),
         ...(controller === undefined ? {} : { signal: controller.signal }),
       })
       for await (const chunk of stream) {
@@ -712,7 +749,12 @@ export function apply(ctx, config = {}) {
   /** Warm the route metadata cache so the first message can select immediately. */
   const prewarm = () => {
     if (!settings.enabled) return
-    void ensureTargets().catch(() => {})
+    void (async () => {
+      await ensureTargets()
+      if (settings.classifier !== 'fast') return
+      const configured = cleanSelection(settings.classifierModel)
+      if (configured !== undefined) await validateTarget(configured)
+    })().catch(() => {})
   }
 
   ctx.on('agent/inbox/inserted', (payload) => {
@@ -762,6 +804,7 @@ export function apply(ctx, config = {}) {
     fetch: async () => {
       const models = await listModels()
       const targets = await ensureTargets()
+      const classifierRoute = settings.classifier === 'fast' ? await resolveClassifierSelection() : undefined
       const effective = {}
       for (const tier of TIERS) {
         const target = targets[tier]
@@ -779,6 +822,14 @@ export function apply(ctx, config = {}) {
         escalateAfterErrors: settings.escalateAfterErrors,
         classifier: settings.classifier,
         classifierTimeoutMs: settings.classifierTimeoutMs,
+        classifierModel: settings.classifierModel,
+        classifierEffective: classifierRoute === undefined
+          ? null
+          : {
+              provider: classifierRoute.provider,
+              model: classifierRoute.model,
+              ...(classifierRoute.reasoningEffort === undefined ? {} : { reasoningEffort: classifierRoute.reasoningEffort }),
+            },
         tiers: settings.tiers,
         models,
         current: currentSelection(),
@@ -810,6 +861,13 @@ export function apply(ctx, config = {}) {
       if (!Number.isInteger(timeout) || timeout < 200 || timeout > 10000) {
         return json({ ok: false, error: 'invalid-classifier-timeout' }, 400)
       }
+      const rawClassifierModel = body.classifierModel !== null && typeof body.classifierModel === 'object' ? body.classifierModel : {}
+      const classifierModelProvider = typeof rawClassifierModel.provider === 'string' ? rawClassifierModel.provider.trim() : ''
+      const classifierModelId = typeof rawClassifierModel.model === 'string' ? rawClassifierModel.model.trim() : ''
+      if ((classifierModelProvider === '') !== (classifierModelId === '')) {
+        return json({ ok: false, error: 'incomplete-classifier-model' }, 400)
+      }
+      const classifierModel = { provider: classifierModelProvider, model: classifierModelId }
       const rawTiers = body.tiers !== null && typeof body.tiers === 'object' ? body.tiers : {}
       const tiers = {}
       for (const tier of TIERS) {
@@ -826,6 +884,7 @@ export function apply(ctx, config = {}) {
         escalateAfterErrors: threshold,
         classifier,
         classifierTimeoutMs: timeout,
+        classifierModel,
         tiers,
       }
       const entry = ctx.fiber !== undefined && ctx.fiber !== null ? ctx.fiber.entry : undefined

@@ -1,6 +1,6 @@
 {
   "name": "dsh-model-autopilot",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "DSH plugin: a left-sidebar panel that switches the agent model per step — light for ordinary turns, medium for focused code work, complex for multi-step tasks and after repeated tool failures. Uses only the providers you already configured; no third-party API keys.",
   "type": "module",
   "license": "MIT",

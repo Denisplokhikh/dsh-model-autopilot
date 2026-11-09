@@ -82,6 +82,7 @@ function createHost(overrides = {}) {
     escalateAfterErrors: 2,
     classifier: 'local',
     classifierTimeoutMs: 1500,
+    classifierModel: { provider: '', model: '' },
     tiers: {
       fast: { provider: '', model: '', reasoningEffort: '' },
       coder: { provider: '', model: '', reasoningEffort: '' },
@@ -144,6 +145,7 @@ function createHost(overrides = {}) {
   const agent = {
     id: 'session-1',
     status: 'running',
+    session: { id: 'session-1' },
     model: {
       current: () => currentHolder.value,
       select: async (selection) => {
@@ -440,6 +442,7 @@ async function testHost() {
   assert.equal(smart.streamCalls[0].model, 'base-model')
   assert.equal(smart.streamCalls[0].maxTokens, 48)
   assert.equal(smart.streamCalls[0].reasoningEffort, 'low', 'классификатор просит минимальное усилие быстрой модели')
+  assert.equal(smart.streamCalls[0].sessionId, 'session-1', 'запрос классификатора несёт id сессии (нужен провайдерам вроде OpenCode Go)')
   const heuristicPick = smart.selected.at(-1)
   assert.deepEqual(heuristicPick, { provider: 'deepseek', model: 'base-model', reasoningEffort: 'low' }, 'эвристика выбирает лёгкий уровень до ответа модели')
   releaseVerdict()
@@ -448,6 +451,40 @@ async function testHost() {
   pass('host: режим "быстрая модель" спрашивает свою быструю модель и уточняет уровень')
 
   // A stale verdict must be dropped when a newer message arrived meanwhile.
+  // --- Explicit classifier model: the request goes to the chosen route --------
+  const dedicated = createHost({
+    config: {
+      enabled: true,
+      classifier: 'fast',
+      classifierModel: { provider: 'deepseek', model: 'heavy-model' },
+      tiers: {
+        fast: { provider: 'deepseek', model: 'fast-model' },
+        coder: { provider: 'deepseek', model: 'coder-model' },
+        heavy: { provider: 'deepseek', model: 'heavy-model' },
+      },
+    },
+    current: { provider: 'deepseek', model: 'fast-model' },
+    stream: async function* () {
+      yield { type: 'text-delta', text: 'fast' }
+      yield { type: 'finish', reason: { kind: 'stop' } }
+    },
+  })
+  mod.apply(dedicated.ctx, { ...dedicated.state })
+  await settle()
+  dedicated.listeners.get('agent/inbox/inserted')({
+    agent: dedicated.agent,
+    message: { role: 'user', source: { kind: 'user' }, content: [{ type: 'text', text: 'напиши что-нибудь' }] },
+  })
+  await settle()
+  assert.equal(dedicated.streamCalls.length, 1, 'выбранная модель классификатора используется')
+  assert.equal(dedicated.streamCalls[0].model, 'heavy-model', 'запрос уходит в явно выбранную модель, а не в fast-уровень')
+  assert.equal(dedicated.streamCalls[0].sessionId, 'session-1')
+  const dedicatedState = await dedicated.routes.get('/api/model-autopilot/state').fetch(new Request('http://local/api/model-autopilot/state'))
+  const dedicatedPayload = await dedicatedState.json()
+  assert.deepEqual(dedicatedPayload.classifierModel, { provider: 'deepseek', model: 'heavy-model' })
+  assert.deepEqual(dedicatedPayload.classifierEffective, { provider: 'deepseek', model: 'heavy-model' })
+  pass('host: классификатор можно явно нацелить на конкретную модель')
+
   const staleResolvers = []
   const stale = createHost({
     config: { enabled: true, classifier: 'fast' },
@@ -489,7 +526,6 @@ async function testHost() {
     body: JSON.stringify({ enabled: true, escalateAfterErrors: 3, classifier: 'fast', classifierTimeoutMs: 42, tiers: {} }),
   }))
   assert.equal(response.status, 400)
-  pass('host: POST отклоняет битый JSON, неизвестный классификатор и таймаут')
 
   response = await settingsRoute.fetch(new Request('http://local/api/model-autopilot/settings', {
     method: 'POST',
@@ -498,6 +534,22 @@ async function testHost() {
       escalateAfterErrors: 3,
       classifier: 'fast',
       classifierTimeoutMs: 2000,
+      classifierModel: { provider: 'deepseek', model: '' },
+      tiers: {},
+    }),
+  }))
+  assert.equal(response.status, 400)
+  assert.equal((await response.json()).error, 'incomplete-classifier-model')
+  pass('host: POST отклоняет битый JSON, неизвестный классификатор, таймаут и неполную модель классификатора')
+
+  response = await settingsRoute.fetch(new Request('http://local/api/model-autopilot/settings', {
+    method: 'POST',
+    body: JSON.stringify({
+      enabled: true,
+      escalateAfterErrors: 3,
+      classifier: 'fast',
+      classifierTimeoutMs: 2000,
+      classifierModel: { provider: 'deepseek', model: 'fast-model' },
       tiers: {
         fast: { provider: 'deepseek', model: 'fast-model', reasoningEffort: 'low' },
         coder: { provider: 'deepseek', model: 'coder-model' },
@@ -510,12 +562,15 @@ async function testHost() {
   assert.equal(explicit.edits.length, 1)
   assert.equal(explicit.edits[0].value.classifier, 'fast')
   assert.equal(explicit.edits[0].value.classifierTimeoutMs, 2000)
+  assert.deepEqual(explicit.edits[0].value.classifierModel, { provider: 'deepseek', model: 'fast-model' })
   assert.equal(explicit.edits[0].value.tiers.heavy.reasoningEffort, 'high')
   const savedState = await explicit.routes.get('/api/model-autopilot/state').fetch(new Request('http://local/api/model-autopilot/state'))
   const savedPayload = await savedState.json()
   assert.equal(savedPayload.classifier, 'fast')
   assert.equal(savedPayload.classifierTimeoutMs, 2000)
-  pass('host: POST настроек сохраняет классификатор, таймаут и усилие уровня')
+  assert.deepEqual(savedPayload.classifierModel, { provider: 'deepseek', model: 'fast-model' })
+  assert.deepEqual(savedPayload.classifierEffective, { provider: 'deepseek', model: 'fast-model' })
+  pass('host: POST настроек сохраняет классификатор, таймаут, модель классификатора и усилие уровня')
 
   assert.ok(!explicit.listeners.has('agent/pre-step'), 'маршрутизация не использует pre-step (выбор модели захвачен раньше)')
   pass('host: маршрутизация не полагается на agent/pre-step')
@@ -594,7 +649,7 @@ async function testClient() {
   assert.equal(localeDicts[0].ns, 'model-autopilot')
   assert.ok(dicts.ru && dicts.en)
   assert.equal(dicts.ru['panel.title'], 'Автопилот моделей')
-  for (const key of ['tiers.hint', 'classifier.label', 'classifier.local', 'classifier.fast', 'effective.auto', 'effective.none', 'reason.classifier']) {
+  for (const key of ['tiers.hint', 'classifier.label', 'classifier.local', 'classifier.fast', 'classifierModel.label', 'classifierModel.hint', 'classifierModel.fast', 'classifierModel.effective', 'classifierModel.missing', 'effective.auto', 'effective.none', 'reason.classifier']) {
     assert.equal(typeof dicts.en[key], 'string', `en dictionary has ${key}`)
     assert.equal(typeof dicts.ru[key], 'string', `ru dictionary has ${key}`)
   }

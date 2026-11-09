@@ -161,6 +161,15 @@ Profile facts read from `C:\Users\minio\.dsh` (read-only); active profile is `de
   dependency; the plugin's `package.json` declares none, so the dependency-free chunk parse is
   the portable choice.
 
+### 7. Provider requirements for auxiliary calls
+
+- F23. OpenCode Go requires its per-conversation routing header on every request: the pi-ai
+  provider wraps each API with `withOpenCodeSessionHeader`, which sets `x-opencode-session` from
+  `options.sessionId` (`pi-ai/dist/providers/opencode-headers.js`, `opencode-go.js`). A request
+  without `sessionId` is rejected by the service (visible in the OpenCode dashboard as a `400`
+  with a `missing_sessi…` reason). The host plugin's `ctx.llm.stream` therefore passes the live
+  session id (`agent.session.id`) and does not rely on provider-specific code.
+
 ## Consequences for the plugin
 
 - Local heuristics must decide the triggering step and must run **synchronously** inside the

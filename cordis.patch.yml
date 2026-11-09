@@ -6,6 +6,9 @@
         escalateAfterErrors: 2
         classifier: local
         classifierTimeoutMs: 1500
+        classifierModel:
+          provider: ''
+          model: ''
         tiers:
           fast:
             provider: ''
